@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+#*=============================================================================
+#* Script Name: 
+#* Created: 
+#* Author: 
+#*=============================================================================
+#* Purpose: 
+#*=============================================================================
+
+#*=============================================================================
+#* REVISION HISTORY
+#*=============================================================================
+#* Date: 
+#* Author: 
+#* Issue: 
+#* Solution: 
+#*=============================================================================
+#* Date: 
+#* Author: 
+#* Issue: 
+#* Solution: 
+#*=============================================================================
+
+#*=============================================================================
+#* GLOBAL VARIABLES
+#*=============================================================================
+DIV1='echo ####################################################################'
+DIV2='echo --------------------------------------------------------------------'
+DIV3='echo ....................................................................'
+ActiveUser=`/bin/ls -l /dev/console | /usr/bin/awk '{ print $3 }' | tr "[a-z]" "[A-Z]"`
+ActiveUserRealName=`dscl . -read /Users/$ActiveUser | grep RealName: | cut -c11-`
+    if [[ -z $ActiveUserRealName ]]; then
+        ActiveUserRealName=`dscl . -read /Users/$ActiveUser | awk '/^RealName:/,/^RecordName:/' | sed -n 2p | cut -c 2-`
+    fi
+computerName=$(scutil --get ComputerName)
+hostName=$(scutil --get HostName)
+localHost=$(scutil --get LocalHostName)
+serialNumber=$(system_profiler SPHardwareDataType | awk '/Serial/ {print $4}')
+serialNumberII=$(system_profiler SPHardwareDataType | awk '/Serial/ {print $4}' | tr -d '"')
+domainAccount=$(dsconfigad -show | grep "Computer Account" | awk '{print $4}' | tr -d '$' | awk '{ print toupper($0) }')
+#*=============================================================================
+#* FUNCTIONS
+#*=============================================================================
+userInfo () {
+    echo; $DIV1
+    echo "User Information:"
+    if [[ "$ActiveUserRealName" == "$ActiveUser" ]]; then
+        echo  "$ActiveUserRealName (Local Admin)"
+    else 
+        echo "$ActiveUserRealName ($ActiveUser)"
+    fi
+    $DIV1
+}
+#*=============================================================================
+#* SCRIPT BODY
+#*=============================================================================
+userInfo
+
+## Check & Update Computer Name
+if [ "$computerName" == "$serialNumber" ]
+then
+	echo "Computer name matches serial number, $serialNumber"
+else
+	echo "Current Computer Name: $computerName"
+	echo "Computer Name does not meet standards"
+	echo "Changing Computer Name to match Serial Number"
+	scutil --set ComputerName "$serialNumber"	
+fi; $DIV2
+
+## Check & Update Host Name
+if [ "$hostName" == "$serialNumber" ]
+then
+	echo "Host Name matches serial number, $serialNumber"
+else
+	echo "Current Host Name: $hostName"
+	echo "Host Name does not meet standards"
+	echo "Changing Host Name to match Serial Number"
+	scutil --set HostName "$serialNumber"
+	
+fi; $DIV2
+
+
+## Check & Update Local Host
+if [ "$localHost" == "$serialNumber" ]
+then
+	echo "Local Host matches serial number, $serialNumber"
+else
+	echo "Current Local Host: $localHost"
+	echo "Local Host does not meet standards"
+	echo "Changing Local Host to match Serial Number"
+	scutil --set LocalHostName "$serialNumber"
+	
+fi; $DIV2
+
+
+## Check & Update Domain Account
+if [ "$domainAccount" == "$serialNumber" ]
+then
+	echo "Domain Account matches serial number, $serialNumber"
+else
+	echo "Current Domain Account: $domainAccount"
+	echo "Domain Account does not meet standards"
+	echo "Computer will need to rejoin domain under new name"
+	sudo jamf policy -event fixDomainConnection
+fi; $DIV1
+
+## Final Check
+computerNameII=$(scutil --get ComputerName)
+hostNameII=$(scutil --get HostName)
+localHostII=$(scutil --get LocalHostName)
+domainAccountII=$(dsconfigad -show | grep "Computer Account" | awk '{print $4}' | tr -d '$' | awk '{ print toupper($0) }')
+
+echo "Results:"; $DIV3
+echo "Serial number: $serialNumber"
+echo "Computer Name: $computerNameII"
+echo "Host Name: $hostNameII"
+echo "Local Host: $localHostII"
+echo "Domain Account: $domainAccountII"
+if [[ "$computerNameII" == "$serialNumber" ]] && [[ "$hostNameII" == "$serialNumber" ]] && [[ "$localHostII" == "$serialNumber" ]] && [[ "$domainAccountII" == "$serialNumber" ]]
+then 
+	echo "Computer Name satisfies naming standards"
+	$DIV1; exit 0
+else
+	echo "Computer does not meet naming standars"
+	echo "More troubleshooting will be necessary."
+    $DIV1; exit 1
+fi 
+
+## Perform final Recon to update computer name on Jamf
+sudo jamf recon
+#*=============================================================================
+#* END OF SCRIPT
+#*=============================================================================
