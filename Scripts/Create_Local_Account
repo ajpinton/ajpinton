@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+ 
+
+################################
+
+# Defining Global Variables
+
+################################
+
+ 
+
+AccountName="Some_Account_Name"
+
+RealName="Some_Users_Name"
+
+Password="For_the_love_of_god_obfuscate_this"
+
+UniqueID="510"
+
+PrimaryGroupID="51"
+
+ 
+
+################################
+
+# Creating Local Account
+
+################################
+
+ 
+
+## Configure account
+
+echo "Configuring account"
+
+dscl . -create /Users/$AccountName
+
+dscl . -create /Users/$AccountName UserShell /bin/bash
+
+dscl . -create /Users/$AccountName RealName "$RealName"
+
+dscl . -create /Users/$AccountName UniqueID "$UniqueID"
+
+dscl . -create /Users/$AccountName PrimaryGroupID “$PrimaryGroupID”
+
+dscl . -create /Users/$AccountName NFSHomeDirectory /Users/Account
+
+sleep 10
+
+ 
+
+dscl . -passwd /Users/$AccountName "$Password"
+
+dscl . -append /Groups/admin GroupMembership $AccountName
+
+createhomedir -c > /dev/null
+
+ 
+
+## Add to SSH group
+
+echo "Adding to SSH group"
+
+sudo dseditgroup -o edit -a "$AccountName" -t user com.apple.access_ssh
+
+ 
+
+## Create .ssh folder
+
+echo "Configuring .ssh folder"
+
+mkdir /Users/$AccountName/.ssh
+
+chmod 755 /Users/$AccountName/.ssh
+
+chown $AccountName:interactusers /Users/$AccountName/.ssh
+
+ 
+
+## Set recursive permissions for folder
+
+echo "Setting recursive folder owner:group to Account:interactusers"
+
+chown -R $AccountName:interactusers /Users/$AccountName/.ssh/
+
+ 
+
+Echo “Account $Some_Account_Name has been created”
+
+Exit 0
