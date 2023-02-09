@@ -1,0 +1,41 @@
+#!/bin/zsh
+ 
+AppToCheck="/Applications/Firefox.app/"
+Result="2000-01-01 00:00:01"
+CurrentDate=$(date +"%Y-%m-%d")
+CurrentDateEpoch=$(date -j -f "%Y-%m-%d" "$CurrentDate" "+%s")
+MaxDaysCompliance="30"
+ 
+if [ -d "${AppToCheck}" ]; then
+    DateLastUsed=$(mdls -name kMDItemLastUsedDate "${AppToCheck}" | cut -f 3 -d \ )
+               
+    if [[ $DateLastUsed -eq null ]]
+        then
+            #If $ApptoCheck has never been launched it will return a value of (null) which will cause $EpochTimeAppNotUsed to error out. If statement will catch (null) response and flag the application for removal.
+            #echo "[[$DateLastUseds is (null)]]"
+            echo "<result>Uninstall</result>"
+        else
+            #Function to take the current date and the date the application was last opened, and gather the days beween with epoch and convers epoch to give a number of days between $CurrentDateEpoch and $DateLastUsedEpoch.
+            DateLastUsedEpoch=$(date -j -f "%Y-%m-%d" "$DateLastUsed" "+%s")
+            #echo "Current Date: $CurrentDate"
+            #echo "Last Time $AppToCheck Was Used $DateLastUsed"
+            EpochTimeAppNotUsed=$(($CurrentDateEpoch - $DateLastUsedEpoch)) # counting time that passed since app was used last time in seconds. As we don't convert to EPOCH time format using hours, minutes and seconds, it will use whole days
+            #echo $EpochTimeAppNotUsed # output time that passed since app wwas used last time in seconds
+            AppNotUsedTimeDays=$(($EpochTimeAppNotUsed / 86400)) # converting to whole days (1 day = 86400 seconds)
+            #echo "Application has not been launched for $AppNotUsedTimeDays days"
+
+            #If statement to flag the application for removal if it has not been used in $MaxDaysCompliance days.
+            if [[ $AppNotUsedTimeDays -lt $MaxDaysCompliance ]]
+                then
+                    #echo $AppNotUsedTimeDays is not greater then $MaxDaysCompliance
+                    echo "<result>Compliant</result>"
+                else
+                    #echo $AppNotUsedTimeDays is greater than $MaxDaysCompliance
+                    echo "<result>Uninstall</result>"
+            fi
+    fi
+    
+     else
+        echo "<result>Not Installed</result>"
+fi
+ exit 0
