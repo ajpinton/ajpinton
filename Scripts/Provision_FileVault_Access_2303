@@ -1,0 +1,125 @@
+#!/bin/bash
+ 
+######################
+# Exit Codes
+# 0 - Success: General Success
+# 1 - Failed: Admin account credentials are not correct
+# 2 - Failed: Mac not domain bound, or otherwise cannot talk to the domain controller
+# 3 - Failed: User account to be cached not found in Active Directory
+# 4 - Success: FileVault Not enabled
+###################### 
+ 
+echo "Begin script"
+ 
+######################
+# Gather and verify admin account
+######################
+ 
+#*------------------------ STRING DECRYPTION ------------------------*#
+ 
+#It is recommented to salt the password so it is not in plane text
+adminUser="LocalAdminUserNameHere"
+adminPass="LocalAdminPasswordHere"
+ 
+osvers=$(sw_vers -productVersion | awk -F. '{print $2}')
+check4AD=`/usr/bin/dscl localhost -list . | grep "Active Directory"`
+ 
+## verify that adminuser and pass variables are both passed to the user
+if [[ -z "$adminUser" ]] || [[ -z "$adminPass" ]] ; then
+                dialog="either Admin User or Password is missing"
+                echo "$dialog"
+                cmd="Tell app \"System Events\" to display dialog \"$dialog\""
+                /usr/bin/osascript -e "$cmd"
+                exit 1
+fi
+ 
+## check the admin password
+adminCheck=$(/usr/bin/dscl /Local/Default -authonly "$adminUser" "$adminPass")
+if [[ -z "$adminCheck" ]] ; then
+                echo "Admin password is verified"
+else
+                echo "Admin Password not working"
+                exit 1
+fi
+ 
+ 
+######################
+# Popups asking for user to ender userID and Password
+######################
+ 
+#this section uses Apple Script to prompt the user to enter their credentials to create a variable to be able to call the user name and password later in the script. 
+ 
+echo "Prompting for userToAdd credentials."
+ 
+## Prompt for Username
+userToAdd=$(/usr/bin/osascript<<END
+tell application "System Events"
+activate
+set the answer to text returned of (display dialog "Enter your userID:" default answer "" buttons {"Continue"} default button 1)
+end tell
+END
+)
+ 
+## Prompt for Password
+userPass=$(/usr/bin/osascript<<END
+tell application "System Events"
+activate
+set the answer to text returned of (display dialog "Enter your Password:" default answer "" with hidden answer buttons {"Continue"} default button 1)
+end tell
+END
+)
+ 
+loopCount=0
+while [ "$loopCount" -lt 3 ]; do
+                # Refresh Directory Services
+                if [[ ${osvers} -ge 7 ]]; then
+                                    /usr/bin/killall opendirectoryd
+                else
+                                    /usr/bin/killall DirectoryService
+                fi
+                sleep 15
+               
+                ## try to auth the user in advance. this seems to increase the success of the ID command.
+                /usr/bin/dscl /Search -authonly "$userToAdd" "$userPass"
+               
+                adCheck=`id $userToAdd`
+                echo "AD Check is: $adCheck"
+                if [[ -z "$adCheck" ]] ; then
+                                    ((loopCount++))
+                else
+                                    echo "AD Check successful"
+                                    break
+                fi
+done 
+ 
+ 
+######################
+# Remove FV Access if existing
+###################### 
+ 
+#If the user has a filevault token from another source this section will remove the filevault token to prevent errors.
+ 
+sleep 2
+sudo fdesetup remove -user $userToAdd
+ 
+## Get the user to be added to FV
+userName=$userToAdd
+ 
+## This "expect" block will populate answers for the sysadminctl variables.
+# Useing sysadminctl instead of fdesetup to provision a filevault token
+ 
+sysadminctl -adminUser "$adminUser" -adminPassword "$adminPass" -secureTokenOn "$userName" -password "$userPass"
+ 
+#/dev/null can be replaced with a log file to echo the results to.
+echo "${userName} has been added to the FileVault 2 list." >> /dev/null
+ 
+ 
+######################
+# Clean up
+###################### 
+ 
+echo "Script completed"
+ 
+ 
+exit 0
+ 
