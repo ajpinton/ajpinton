@@ -1,0 +1,68 @@
+#!/bin/zsh
+
+######################
+# Script Name: Zscaler_Status.sh
+# Author: Anthony Pinto
+# Date: 09.26.2023
+# Purpose: Identify and report on zscalers connection status
+######################
+
+######################
+# websecurity Status Codes
+# 0 - Zscailer is off
+# 1 - Zscaler is on
+# 2 - Zscaler is Connecting
+# 3 - NONE_FORWARDING / Disabled
+# 4 - TUNNEL_FORWARDING / On - Zscaler Connect Offiste
+# 5 - LOCAL_PROXY_FORWARDING - Zscaler Connected Onsite
+###################### 
+
+
+# Set the directory and file name patterns
+directory="/Library/Application Support/Zscaler"
+filename="ztstatus"
+extension=".log"
+key="websecurity"
+
+# List all matching log files in the directory
+log_files=("$directory"/"$filename"*.log)
+
+# Check if any log files were found
+if [ ${#log_files[@]} -eq 0 ]; then
+  echo "No log files found matching the pattern."
+  exit 1
+fi
+
+# Loop through the log files and search for the key using PlistBuddy
+for log_file in "${log_files[@]}"; do
+  # Check if the log file exists
+  if [ ! -f "$log_file" ]; then
+    echo "<result>Error: Log file does not exist</result>"
+    continue
+  fi
+  
+  # Use PlistBuddy to search for the key in the log file
+  value=$( /usr/libexec/PlistBuddy -c "Print :$key" "$log_file" 2>/dev/null )
+  
+  # Check if the key exists in the log file
+  if [ -n "$value" ]; then
+    #echo "Log file: $log_file"
+    #echo "Value of '$keynamehere': $value"
+    
+    # Check the value and echo the corresponding text
+    if [ "$value" -eq 0 ]; then
+      echo "<result>Off</result>"
+    elif [ "$value" -eq 1 ]; then
+      echo "<result>On</result>"
+    elif [ "$value" -eq 2 ]; then
+      echo "<result>Connecting</result>"
+    elif [ "$value" -eq 3 ]; then
+      echo "<result>Disabled</result>"
+    elif [ "$value" -eq 4 ]; then
+      echo "<result>Connected Off Site</result>"
+    elif [ "$value" -eq 5 ]; then
+      echo "<result>Connected On Site</result>"
+    fi
+  fi
+done
+
