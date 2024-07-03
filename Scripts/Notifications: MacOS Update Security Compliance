@@ -1,0 +1,93 @@
+!/bin/bash
+#* FileName: Notifications: MacOS Update Security Compliance
+#*=============================================================================
+#* Script Name: Notifications: MacOS Update Security Compliance
+#* Script Purpose: Use Jamf Helpder to notify users when OS updates are available.
+#* Created: [2/14/2023]
+#* Author: 
+#*=============================================================================
+#* Purpose: Installs the standard user assets and configuration
+#*=============================================================================
+ 
+#*=============================================================================
+#* REVISION HISTORY
+#*=============================================================================
+#* Date: [10.31.23]
+#* Author: 
+#* Issue: Enhacement
+#* Solution: Replaced the function that opens software update for macOS 14.
+#*=============================================================================
+ 
+loggedInUser=$(/usr/bin/who | awk '/console/{ print $1 }')
+ 
+ 
+if [[ $loggedInUser != '' ]]
+then
+                echo "$loggedInUser is logged in, proceeding with script."
+else
+                echo "No logged in user, exiting."
+                exit 0
+fi
+ 
+#*=============================================================================
+#* JAMF Helper Dialog
+#*=============================================================================
+ 
+jamfHelper="/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
+loggedInUser=$(/usr/bin/who | awk '/console/{ print $1 }')
+windowType="hud"
+description="Hello,
+ 
+Technology has identified your computer as having available Software Updates. Please install any available Software Updates as soon as convenient.
+ 
+- Clicking Acknowledge below will open the Software Update Pane in System Settings, you may install any available software updates
+- If Defer is selected you will be prompted again tomorrow
+- You may manually navigate to System Settings > General > Software Update
+ 
+ 
+Thank you for helping to make sure that your computer remains updated and secure. If you need assistance, please contact the support center at 205.261.4357.
+ 
+ 
+"
+heading="Critical MacOS Updates: Action Required"
+button1="Acknowledge"
+button2="Defer"
+icon="/Library/Desktop Pictures/DesktopBG-8x5-v4.jpg"
+title="MacOS Updates Available" 
+defaultButton="1"
+cancelButton="2"
+iconSize="240"
+ 
+#*=============================================================================
+#* Begin JAMF Helper
+#*=============================================================================
+ 
+#Checking to see if the device has available OS updates, if updates are available prompt user with JAMF Helper else exit.
+OS_Update_Status=$(sudo softwareupdate -l | grep "Title")
+ 
+if [[ $OS_Update_Status != '' ]]
+then
+                echo "Updates Available, prompting user."
+                #Running JAMF Helper
+                userChoice=$("$jamfHelper" -windowType "$windowType" -title "$title" -heading "$heading" -description "$description" -defaultButton "$defaultButton" -cancelButton "$cancelButton" -icon "$icon" -iconSize "$iconSize" -alignHeading "$alignHeading" -button1 "$button1" -button2 "$button2")
+               
+                #Opening Software Update or Differing based on user choice
+                if [ "$userChoice" == "0" ]; then
+                                    echo "$loggedInUser clicked Acknowledge, Opening Software Update Preference Pane."
+                                    open 'x-apple.systempreferences:com.apple.Software-Update-Settings.extension'
+        # open -b com.apple.systempreferences /System/Library/PreferencePanes/SoftwareUpdate.prefPane
+                                    exit 0 
+                elif [ "$userChoice" == "2" ]; then
+                                    echo "$loggedInUser clicked "Defer"; now exiting."
+                                    exit 0
+                fi
+else
+                echo "Device Reporting no available updates, exiting"
+fi
+ 
+ 
+ 
+#*=============================================================================
+#*End JAMF Helper
+#*=============================================================================
+ 
