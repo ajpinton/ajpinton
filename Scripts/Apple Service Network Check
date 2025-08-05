@@ -1,0 +1,140 @@
+#!/bin/bash
+
+#################################################################
+# Script Name: Apple Service Network Check
+# Script Author:
+# Modify Date: 8/4/25
+# Version: 0.1
+# Script Purpose: Validating required ports and 
+# Script Purpose: hosts for apple network services to function
+#################################################################
+
+
+# Timeout in seconds
+TIMEOUT=5
+
+# List of hosts and ports
+declare -a hosts_ports=(
+# Jamf Pro Hosts
+"jamfcloud.com:443"
+"use1-jcds.services.jamfcloud.com:443"
+
+# Jamf Protect Hosts
+"s3.amazonaws.com:443"
+"a3bwx220ks5p1x-ats.iot.us-east-1.amazonaws.com:443"
+"prod-use1-jamf-jpt-configs.s3.amazonaws.com:443"
+"a3bwx220ks5p1x-ats.iot.us-west-2.amazonaws.com:443"
+"prod-usw2-jamf-jpt-configs.s3.amazonaws.com:443"
+
+# Apple Hosts
+"apple.com:80"
+"apple.com:443"
+"fba.apple.com:443" # Used for feedback and diagnostics
+# Apple Developer
+"download.developer.apple.com:80" # Developer downloads
+"download.developer.apple.com:443" # Developer downloads
+"diagassets.apple.com:443" # Diagnostic assets for Apple devices
+# Apple Beta
+"bpapi.apple.com:443" # Beta program APIs
+"cssubmissions.apple.com:443" # Beta feedback submissions
+# Device Setup & Activation
+"albert.apple.com:443" # Device activation
+#"captive.apple.com:80" # Optional: Captive portal detection
+#"captive.apple.com:443" # Optional: Captive portal detection
+"humb.apple.com:443" # Device provisioning
+"static.ips.apple.com:80" # IP geolocation
+"static.ips.apple.com:443" # IP geolocation
+#"sq-device.apple.com:443" # Optional: eSIM activation (not needed for macOS)
+"tbsc.apple.com:443" # Device setup
+#"time.apple.com:123" # Optional: NTP time sync - UDP and cannot be checked with nc.
+#"time-ios.apple.com:123" # Optional: iOS-specific NTP - UDP and cannot be checked with nc.
+#"time-macos.apple.com:123" # Optional: macOS-specific NTP - UDP and cannot be checked with nc.
+
+# Device Management
+"deviceenrollment.apple.com:443" # Automated Device Enrollment
+"deviceservices-external.apple.com:443" # Activation Lock management
+"gdmf.apple.com:443" # Software update catalog
+"identity.apple.com:443" # APNs certificate portal
+"iprofiles.apple.com:443" # Enrollment profiles for ASM/ABM
+"mdmenrollment.apple.com:443" # MDM enrollment profile upload and lookup
+#"axm-servicediscovery.apple.com" # Optional: Account-driven enrollment discovery
+#"setup.icloud.com:443" # Optional: Managed Apple ID login for Shared iPad
+
+# Software Updates and App Store
+#"appldnld.apple.com:80" # Optional: iOS/iPadOS updates
+"gg.apple.com:80" # Software update catalog
+"gg.apple.com:443" # Software update catalog
+"gs.apple.com:80" # OS updates (all platforms)
+"gs.apple.com:443" # OS updates (all platforms)
+"ig.apple.com:443" # macOS updates
+"mesu.apple.com:80" # Software update metadata
+"mesu.apple.com:443" # Software update metadata
+"swcdn.apple.com:80" # macOS update content
+"swcdn.apple.com:443" # macOS update content
+"swdownload.apple.com:80" # macOS update content
+"swdownload.apple.com:443" # macOS update content
+"swdist.apple.com:443" # macOS update distribution
+"swscan.apple.com:80" # macOS update scanning
+"swscan.apple.com:443" # macOS update scanning
+"updates-http.cdn-apple.com:80" # Software update downloads
+"updates-http.cdn-apple.com:443" # Software update downloads
+"gdmf-ados.apple.com:443" # Additional software update catalog
+"gsra.apple.com:443" # Additional OS update components
+"wkms-public.apple.com:443" # Optional: OS installation on attached devices
+"fcs-keys-pub-prod.cdn-apple.com:443" # Optional: OS installation on attached devices
+"itunes.apple.com:443" # App Store and media services
+"apps.apple.com:443" # App Store content
+"mzstatic.com:443" # App/media content and alternative marketplaces
+"oscdn.apple.com:80" # macOS Recovery
+"oscdn.apple.com:443" # macOS Recovery
+"osrecovery.apple.com:80" # macOS Recovery
+"osrecovery.apple.com:443" # macOS Recovery
+"skl.apple.com:80" # macOS updates
+"skl.apple.com:443" # macOS updates
+"updates.cdn-apple.com:443" # Software update downloads
+"xp.apple.com:443" # OS update and provisioning
+"configuration.apple.com:443" # Rosetta 2 installation
+# iCloud and Apple Account
+"account.apple.com:443" # Apple ID account management
+"appleid.cdn-apple.com:443" # Apple ID services
+"idmsa.apple.com:443" # Apple ID authentication
+
+# Security and Certificates
+"ocsp.apple.com:80" # Certificate validation
+"ocsp2.apple.com:443" # Certificate validation
+"crl.apple.com:80" # Certificate revocation list
+"certs.apple.com:443" # Certificate services
+"crl3.digicert.com:80" # Third-party certificate revocation
+"crl4.digicert.com:80" # Third-party certificate revocation
+"ocsp.digicert.com:80" # Third-party certificate validation
+"valid.apple.com:443" # Certificate validation
+
+# Apple Intelligence (Optional)
+"guzzoni.apple.com:443" # Siri and dictation
+#"*.smoot.apple.com:443" # Optional: Search services (Siri, Spotlight, Safari, etc.)
+"apple-relay.cloudflare.com:443" # Private Cloud Compute
+"apple-relay.fastly-edge.com:443" # Private Cloud Compute
+"cp4.cloudflare.com:443" # Private Cloud Compute
+"apple-relay.apple.com:443" # Apple Intelligence extensions
+# Associated Domains (Required for SSO Extensions)
+"app-site-association.cdn-apple.com:443" # Universal links
+"app-site-association.networking.apple:443" # Universal links
+)
+
+# Add courier.push.apple.com hosts (1–50) for ports 443 and 5223
+for i in {1..50}; do
+  hosts_ports+=("${i}-courier.push.apple.com:443")
+  hosts_ports+=("${i}-courier.push.apple.com:5223")
+done
+
+# Run connectivity checks
+for entry in "${hosts_ports[@]}"; do
+  IFS=":" read -r host port <<< "$entry"
+  echo "Checking $host on port $port..."
+  nc -zv -w "$TIMEOUT" "$host" "$port" &>/dev/null
+  if [[ $? -eq 0 ]]; then
+    echo "$host:$port is reachable"
+  else
+    echo "$host:$port is not reachable (timeout or refused)"
+  fi
+done
